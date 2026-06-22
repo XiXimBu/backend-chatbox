@@ -17,10 +17,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Chatbox API", lifespan=lifespan)
 app.include_router(index_controller.router)
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
+origins = [origin.strip() for origin in raw_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Cho phép Frontend này truy cập
+    allow_origins=origins, # Cho phép Frontend này truy cập
     allow_credentials=True,
     allow_methods=["*"], # Cho phép mọi method (GET, POST...)
     allow_headers=["*"], # Cho phép mọi header
