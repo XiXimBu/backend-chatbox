@@ -1,5 +1,5 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from helper.import_helper import load_module
 
@@ -9,20 +9,31 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 
 class ChatRequest(BaseModel):
-    user_id: str
-    message: str
+    user_id: str = Field(min_length=1)
+    message: str = Field(min_length=1)
     level: str = "basic"
     topic: str = "python"
+
 
 class ChatResponse(BaseModel):
     reply: str
 
+
 @router.post("/chat", response_model=ChatResponse)
 def chat_with_bot(request: ChatRequest):
-    reply = chat_service_mod.chat_service.send_message(
-        request.user_id,
-        request.message,
-        request.level,
-        request.topic,
-    )
+    try:
+        reply = chat_service_mod.chat_service.send_message(
+            request.user_id,
+            request.message,
+            request.level,
+            request.topic,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Không thể xử lý tin nhắn: {error}",
+        )
+
     return ChatResponse(reply=reply)
