@@ -7,7 +7,7 @@ from helper.import_helper import load_module
 
 load_dotenv()
 
-MODEL = "gemini-1.5-flash"
+MODEL = "gemini-2.5-flash"
 prompt_core = load_module("prompt_core", "core", "promt.core.py")
 
 _client = None
