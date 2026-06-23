@@ -1,12 +1,21 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from google.genai import errors
 
 from helper.import_helper import load_module
-from google.genai import errors
 
 chat_service_mod = load_module("chat_service", "services", "chat.service.py")
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
+BUSY_REPLY = (
+    "⚠️ [Hệ thống] Model AI đang quá tải tạm thời (Google Gemini 503). "
+    "Vui lòng đợi 30–60 giây rồi gửi lại tin nhắn."
+)
+RATE_LIMIT_REPLY = (
+    "⚠️ [Hệ thống] Đã vượt hạn mức API Google (429). "
+    "Vui lòng đợi khoảng 1 phút rồi thử lại."
+)
 
 
 class ChatRequest(BaseModel):
@@ -29,17 +38,16 @@ def chat_with_bot(request: ChatRequest):
             request.level,
             request.topic,
         )
-    except errors.ClientError as e:
-        if e.code == 429:
-            # Trả về mã 200 bình thường kèm tin nhắn thân thiện để UI vẽ ra bong bóng chat
-            return ChatResponse(reply="⚠️ [Hệ thống] Bot đã kiệt sức vì phỏng vấn quá nhiều ứng viên (Hết hạn mức API Google). Vui lòng đợi khoảng 1 phút rồi hẵng chat tiếp nhé!")
-        else:
-            raise HTTPException(status_code=500, detail=f"Lỗi API Gemini: {e.message}")
-            
+    except errors.ClientError as error:
+        if error.code == 429:
+            return ChatResponse(reply=RATE_LIMIT_REPLY)
+        raise HTTPException(status_code=400, detail=f"Lỗi API Gemini: {error.message}")
+    except errors.ServerError as error:
+        if error.code in {503, 502, 504}:
+            return ChatResponse(reply=BUSY_REPLY)
+        raise HTTPException(status_code=502, detail=f"Lỗi server Gemini: {error.message}")
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
-        
-    # 3. NẾU LÀ CÁC LỖI KHÁC (NHƯ SẬP DATABASE) THÌ MỚI BÁO 500
     except Exception as error:
         raise HTTPException(
             status_code=500,
